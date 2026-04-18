@@ -4,13 +4,16 @@ const { Pool } = require('pg');
 
 const app = express();
 
-
 app.use(cors());
 app.use(express.json());
 
+// CONFIGURAÇÃO DO BANCO NEON
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
-// PARTE 1: ATIVIDADE ANTIGA (Cientistas)
-
+// PARTE 1: CIENTISTAS (Atividade Anterior)
 const citacoesCientistas = [
   { autor: "Albert Einstein", citacao: "A imaginação é mais importante que o conhecimento." },
   { autor: "Isaac Newton", citacao: "Se vi mais longe, foi por estar de pé sobre ombros de gigantes." },
@@ -22,21 +25,10 @@ const citacoesCientistas = [
   { autor: "Carl Sagan", citacao: "Alegações extraordinárias exigem evidências extraordinárias." },
   { autor: "Richard Feynman", citacao: "O que eu não posso criar, eu não entendo." },
   { autor: "Niels Bohr", citacao: "Um especialista é uma pessoa que cometeu todos os erros possíveis numa área muito restrita." }
-  
 ];
 
 app.get('/', (req, res) => {
   res.send('API Express rodando! Servindo Cientistas e Tarefas.');
-});
-
-app.get('/random', (req, res) => {
-  const numero = Math.floor(Math.random() * 100) + 1;
-  res.send(numero.toString());
-});
-
-app.get('/dado', (req, res) => {
-  const dado = Math.floor(Math.random() * 6) + 1;
-  res.send(dado.toString());
 });
 
 app.get('/citacoes', (req, res) => {
@@ -44,16 +36,9 @@ app.get('/citacoes', (req, res) => {
   res.send(citacoesCientistas[indiceAleatorio]);
 });
 
+// PARTE 2: TAREFAS (Atividade Atual)
 
-// PARTE 2: ATIVIDADE NOVA (Tarefas NeonDB)
-
-
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false }
-});
-
+// LISTAR
 app.get('/tarefas', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM tarefas ORDER BY id ASC');
@@ -63,33 +48,34 @@ app.get('/tarefas', async (req, res) => {
   }
 });
 
-app.get('/tarefas/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await pool.query('SELECT * FROM tarefas WHERE id = $1', [id]);
-    res.json(result.rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
+// CRIAR (POST) - Ajustado para ser flexível
 app.post('/tarefas', async (req, res) => {
   try {
-    const { descricao, concluida } = req.body;
+    // Pega o valor independente do nome que o app enviar (descricao, texto ou tarefa)
+    const descricao = req.body.descricao || req.body.texto || req.body.tarefa;
+    const concluida = req.body.concluida || false;
+
+    if (!descricao) {
+      return res.status(400).json({ error: "Descrição é obrigatória" });
+    }
+
     const result = await pool.query(
       'INSERT INTO tarefas (descricao, concluida) VALUES ($1, $2) RETURNING *',
-      [descricao, concluida || false]
+      [descricao, concluida]
     );
-    res.json(result.rows);
+    res.json(result.rows); // Retorna o objeto criado
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
+// ATUALIZAR (PUT)
 app.put('/tarefas/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { descricao, concluida } = req.body;
+    const descricao = req.body.descricao || req.body.texto || req.body.tarefa;
+    const { concluida } = req.body;
+
     const result = await pool.query(
       'UPDATE tarefas SET descricao = $1, concluida = $2 WHERE id = $3 RETURNING *',
       [descricao, concluida, id]
@@ -100,6 +86,7 @@ app.put('/tarefas/:id', async (req, res) => {
   }
 });
 
+// DELETAR
 app.delete('/tarefas/:id', async (req, res) => {
   try {
     const { id } = req.params;
