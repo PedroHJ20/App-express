@@ -19,6 +19,8 @@
   },
   "homepage": "https://github.com/PedroHJ20/App-express#readme",
   "dependencies": {
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "pg": "^8.11.3",
+    "cors": "^2.8.5"
   }
 }
